@@ -1,0 +1,64 @@
+@startuml
+    !define LIGHTBLUE
+    !include styles/style.puml
+
+    abstract Server{
+        + host
+        + port
+        # router
+        --
+        + start()
+    }
+
+    class HttpServer{
+        + host
+        + port
+        # router
+        # server_socket
+        --
+        + handle_client(client_socket) 
+        + start()
+    }
+    class AsyncHttpServer{
+        + host
+        + port
+        # router
+        --
+        + handle_client(reader:StreamReader,writer:StreamWriter)
+        + start()
+
+    }
+    class HttpRequest{
+        # raw_request: rString
+        # method: str
+        # path: str
+        # headers: dict
+        # body: str
+        --
+        + parse_request():str,str,dict,str
+    }
+    class HttpResponse{
+        # status: int
+        # body: str
+        # content_type: str
+        --
+        + build_response():str
+
+    }
+    class Router{
+        # routes: dict
+        --
+        + add_route(path:str,handler:Callable)
+        + route_request(request:HttpRequest): HttpResponse
+    }
+    HttpServer      --|> Server : inherits
+    AsyncHttpServer --|> Server : inherits
+    AsyncHttpServer *-- Router : references
+    AsyncHttpServer ..> HttpRequest : uses
+    AsyncHttpServer ..> HttpResponse : uses
+    Router          ..> HttpRequest : uses
+    Router          ..> HttpResponse : uses
+    
+@enduml
+
+
