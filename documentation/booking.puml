@@ -1,0 +1,67 @@
+@startuml BookingsAndParser
+    !define LIGHTBLUE
+    !include styles/style.puml
+    ' left to right direction
+    
+    class BaseModel
+    class Booking {
+        + booking_id:str
+        + customer_id:str
+        + customer_name:str
+        + email:str
+        + phone: str
+        + booking_date: date
+        + travel_date: date
+        + return_date: Optional[date] 
+        + destination: str
+        + departure_city: str
+        + flight_number: str
+        + hotel_name: str
+        + room_type: str
+        + total_price: float
+        + payment_status: str
+        + payment_method: str
+        + travel_agency: Optional[str]
+        + special_requests: Optional[str]
+        + loyalty_program_number: Optional[str]
+        }
+
+    class BookingManager{
+        # _bookings
+        --
+        + add_bookings(bookings:List<List<String>>)
+        + add_booking(booking:List<String>)
+        + get_all_bookings() : String<Bookings>
+    }
+    class BookingAnalyzer {
+        --
+        + bookings_per_departure_city(bookings:List<Booking>) : List<Tuple<str,int>>
+        + average_booking_price(bookings:List<Booking>): float
+        + most_frequent_destination(bookings:List<Booking>): List<Tuple<str,int>>
+    }
+    class Parser {
+        --
+        + parse_one(file_path:str,skip_header:boolean): String
+        + parse_complete(file_path:str): List<String>
+    }
+
+    class CsvParser{
+        --
+        + parse_one(file_path:str,skip_header:boolean): String
+        + parse_complete(file_path:str): List<String>
+    }
+                                
+    Booking --|> BaseModel
+    CsvParser --|> Parser
+    BookingManager o-- "0..*" Booking: consists of
+    BookingAnalyzer --> "0..*" BookingManager:gets items
+    
+   /'  myClass---> "0..*" b:Association
+    myClass--|>b:Inheritance
+    myClass..|>b:Realisation
+    myClass..>b:Dependancy
+    c o-- myClass : Aggregation
+    c o-- b : Aggregation
+    myClass*-->b:Composition    
+    class Booking '/
+@enduml
