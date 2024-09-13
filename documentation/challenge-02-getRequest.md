@@ -1,4 +1,4 @@
-# Challenge 02 -- Basic CRUD Application without Frameworks
+# Challenge 02 -- Basic HTTP Request without External Libraries
 
 ## The Challenge
 
