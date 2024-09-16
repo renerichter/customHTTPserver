@@ -7,12 +7,14 @@
 
 ## The UML Diagram
 
-![](images/challenge-01-csvParsing.png)
+Booking Class relations
+
+![](images/01-BookingClass.png)
 
 ## The Solution
 
 spread out here and there:
-- [csvParser](../app/controller/csvParser.py)
+- [csvParser](../app/controller/parser.py)
 - [booking-class](../app/model/booking.py)
 - [test generator](../test/generateBookingData.py)
 - [main](../main.py) to run stuff

@@ -1,19 +1,33 @@
-from app.controller.csvParser import CsvParser
-from app.model.booking import Booking, BookingAnalyzer, BookingManager
+from app.controller.httpClient import HttpClient
+from app.controller.parser import ParserFactory
+from app.model.booking import BookingAnalyzer, BookingManager
+
+test_booking = False
+test_getRequest = False
+test_
 
 if __name__ == '__main__':
     print("こんにちは！元気ですか?")
     # do something
-    file_path = 'data/travel_bookings.csv'
-    csv_parser = CsvParser()
-    booking_manager = BookingManager()
-    booking_manager.add_bookings(csv_parser.parse_complete(file_path))
-    bookings = booking_manager.get_all_bookings()
-    booking_analyzer = BookingAnalyzer()
-    dep_cities=booking_analyzer.bookings_per_departure_city(bookings)
-    print(dep_cities)
+    parser_factory = ParserFactory()
+    if test_booking:
+        file_path = 'data/travel_bookings.csv'
+        parser = parser_factory.getParser('csv')
+        booking_manager = BookingManager()
+        booking_manager.add_bookings(parser.parse_complete(file_path))
+        bookings = booking_manager.get_all_bookings()
+        booking_analyzer = BookingAnalyzer()
+        dep_cities=booking_analyzer.bookings_per_departure_city(bookings)
+        print(dep_cities)
+    if test_getRequest:
+        parser = parser_factory.getParser('json')
+        url_api = "api.open-meteo.com"
+        # weather at mount fuji
+        #weather_query = "/v1/forecast?latitude=35.21&longitude=138.43&current_weather=true"
+        #client = HttpClient(url_api)
+        #result = client.get(weather_query)
+        result = '{"latitude":35.2,"longitude":138.4375,"generationtime_ms":0.06496906280517578,"utc_offset_seconds":0,"timezone":"GMT","timezone_abbreviation":"GMT","elevation":730.0,"current_weather_units":{"time":"iso8601","interval":"seconds","temperature":"°C","windspeed":"km/h","winddirection":"°","is_day":"","weathercode":"wmo code"},"current_weather":{"time":"2024-09-13T13:15","interval":900,"temperature":21.3,"windspeed":3.3,"winddirection":264,"is_day":0,"weathercode":0}}'
+        parsed_result= parser.parse_one(result)
+        print(parsed_result)
     
     print("'Elegance is the elimination of excess.' – Bruce Lee")
-    
-
-

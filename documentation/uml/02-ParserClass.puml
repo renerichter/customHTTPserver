@@ -1,0 +1,40 @@
+@startuml
+    !define LIGHTBLUE
+    !include styles/style.puml
+
+    class Parser {
+        --
+        + parse_one(file_path:str): str
+        + parse_complete(file_path:str|List<str>): List<str>
+    }
+
+    class CsvParser{
+        + skip_header:bool
+        --
+        + parse_one(file_path:str): str
+        + parse_complete(file_path:str|List<str>): List<str>
+        + set_skip_header(skip_header:bool)
+    }
+    class JsonParser{
+        + source: str | List<str>
+        --
+        + parse_one(file_path:str): str
+        + parse_complete(file_path:str|List<str>): List<str>
+        # parse_array(idx:int) : Tuple<List<Any>,int>
+        # parse_dict(idx:int): Tuple<Dict<Any,Any>,int>
+        # parse_number(idx:int) : Tuple<float,int>
+        # parse_string(idx:int) : Tuple<str,int>
+        # parse_value(idx:int) : Tuple<Any,int>
+    }
+
+    class ParserFactory{
+        # parser_history: List<Parser>
+        --
+        + getParser(parser:str) -> Parser
+        
+    }
+    CsvParser --|> Parser
+    JsonParser --|> Parser
+    ParserFactory --> Parser : creates
+
+@enduml    

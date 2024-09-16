@@ -7,8 +7,13 @@
 
 ## The UML Diagram
 
-???
+Extended Parser Class.
+
+![](./images/02-ParserClass.png)
 
 ## The Solution
 
-???
+distributed in 
+
+* [controller -> parser](../app/controller/parser.py)
+* [main](../main.py)

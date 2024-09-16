@@ -39,20 +39,8 @@
         + average_booking_price(bookings:List<Booking>): float
         + most_frequent_destination(bookings:List<Booking>): List<Tuple<str,int>>
     }
-    class Parser {
-        --
-        + parse_one(file_path:str,skip_header:boolean): String
-        + parse_complete(file_path:str): List<String>
-    }
-
-    class CsvParser{
-        --
-        + parse_one(file_path:str,skip_header:boolean): String
-        + parse_complete(file_path:str): List<String>
-    }
                                 
     Booking --|> BaseModel
-    CsvParser --|> Parser
     BookingManager o-- "0..*" Booking: consists of
     BookingAnalyzer --> "0..*" BookingManager:gets items
     
