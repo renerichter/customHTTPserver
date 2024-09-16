@@ -16,7 +16,7 @@ class DatabaseConnection:
         self.conn = None
 
     @abstractmethod
-    def __enter__(self) -> Callable[...,extensions.connection]:
+    def __enter__(self) -> Callable[...,Any]:
         pass
 
     @abstractmethod
@@ -24,8 +24,6 @@ class DatabaseConnection:
         pass
  
 class PostgresqlDB(DatabaseConnection):
-    def __init__(self, host: str, port: int, dbname: str, user: str, password: str) -> None:
-        super().__init__(host, port, dbname, user, password)
 
     def __enter__(self) -> Callable[...,extensions.connection]:
         self.conn = connect(host=self.host,

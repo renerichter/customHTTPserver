@@ -11,4 +11,18 @@
 
 ## The Solution
 
-???
+classes 
+
+MockCursor -> execute, ...
+MockDatabaseConnection -> enter,exit
+MockDB -> cursor
+
+
+TestCase -> init, run; assertions
+
+TestSuite -> add_test, run
+
+TestTravelCrud(TestCase) -> setUp,test_create_schema, test_insert_...
+# -> tests on real class, but with all fake data and interfaces
+
+
