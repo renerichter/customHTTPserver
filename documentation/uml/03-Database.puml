@@ -1,0 +1,34 @@
+@startuml classes
+  !define LIGHTBLUE
+  !include styles/style.puml
+  set namespaceSeparator none
+  class "BasicCRUD" as BasicCRUD {
+    db_operation(func: Callable[..., Any]) -> Any
+  }
+  class "DatabaseConnection"{
+    conn : NoneType
+    dbname : str
+    host : str
+    password : str
+    port : int
+    user : str
+  }
+  class "PostgresqlDB"{
+    conn
+  }
+  class "travelCRUD"{
+    db
+    db_params : Dict[str, Any]
+    table_name : str
+    check_table_exists(cur)
+    create_schema(cur)
+    delete_booking(cur, booking_id: str)
+    delete_database(cur)
+    get_email_addresses(cur)
+    insert_data_from_list(cur, data: List[str])
+    update_payment_status(cur, booking_id: str, new_status: str)
+  }
+  PostgresqlDB --|> DatabaseConnection
+  travelCRUD --|> BasicCRUD
+  PostgresqlDB --o travelCRUD : db
+@enduml

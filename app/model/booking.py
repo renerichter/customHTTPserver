@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from pydantic import BaseModel
 
@@ -25,6 +25,17 @@ class Booking(BaseModel):
     special_requests: Optional[str]
     loyalty_program_number: Optional[str]
     
+    def get_as_dict(self):
+        return self.model_dump()
+    
+    def get_keys_as_list(self)->List[Any]: 
+        model_dict = self.get_as_dict()
+        return model_dict.keys()
+        
+    def get_values_as_list(self)->List[Any]:
+        model_dict = self.get_as_dict()
+        return list(model_dict.values())
+    
     class Config:
         arbitrary_types_allowed = True
         anystr_strip_whitespace = True
@@ -43,6 +54,15 @@ class BookingManager:
     
     def get_all_bookings(self)->List[Booking]:
         return self._bookings
+    
+    def to_list(self,idx):
+        return [self._bookings[idx].get_keys_as_list(),self._bookings[idx].get_values_as_list()]
+    
+    def all_bookings_to_list(self):
+        new_keys=self._bookings[0].get_keys_as_list()
+        new_values=[booking.get_values_as_list() for booking in self._bookings]
+        return new_keys,new_values
+        
 
 class BookingAnalyzer:
     def bookings_per_departure_city(self,bookings:List[Booking])->List[tuple[str,Any]]:
