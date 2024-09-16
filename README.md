@@ -6,9 +6,9 @@ Here I will build a `customHttpServer`. I will build it from scratch, so I creat
 
 The Challenges range from Easy (🍏) to expert (🛰️) and become more difficult with every step.
 
-* [🍏01 -- Manual File Parsing and Basic Data Aggregation](./documentation/challenge-01-csvParsing.md)
-* [🍏02 -- Basic HTTP Request without External Libraries](./documentation/challenge-02-getRequest.md)
-* [🧩03 -- Basic CRUD Application without Frameworks](./documentation/)
+* ✅ [🍏01 -- Manual File Parsing and Basic Data Aggregation](./documentation/challenge-01-csvParsing.md)
+* ✅ [🍏02 -- Basic HTTP Request without External Libraries](./documentation/challenge-02-getRequest.md)
+* [🧩03 -- Basic CRUD Application without Frameworks](./documentation/challenge-03-basicCrud.md)
 * [🧩04 -- Custom Unit Testing Framework](./documentation/challenge-04-UnitTest.md)
 * [🧠05 -- Custom HTTP Server](./documentation/challenge-05-HttpServer.md)
 * [🧠06 -- Manual Data Caching](./documentation/challenge-06-DataCaching.md)
