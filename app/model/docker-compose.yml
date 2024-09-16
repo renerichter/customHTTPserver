@@ -1,0 +1,37 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: postgres_sqlalchemy_playground
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: sqlalchemy1
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/my/path/to/customHTTPserver/postgresDB/data
+    networks:
+      - postgresql_network
+  pgadmin:
+    image: elestio/pgadmin
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@mydomain.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports: 
+      - "5050:80"
+    depends_on:
+      - postgres
+    networks:
+      - postgresql_network
+    volumes:
+      - pgadmin_data:/my/path/to/customHTTPserver/postgresDB/pgadmin_data
+      - ./servers.json:/pgadmin4/servers.json
+
+volumes:
+  postgres_data:
+  pgadmin_data:
+
+networks:
+  postgresql_network:
