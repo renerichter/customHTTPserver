@@ -1,7 +1,6 @@
 @startuml classes
   !define LIGHTBLUE
   !include styles/style.puml
-  set namespaceSeparator none
   class "BasicCRUD" as BasicCRUD {
     db_operation(func: Callable[..., Any]) -> Any
   }
