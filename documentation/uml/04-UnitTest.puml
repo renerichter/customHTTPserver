@@ -1,0 +1,61 @@
+@startuml UnitTest
+  !define LIGHTBLUE
+  !include styles/style.puml
+    class "MockCursor" {
+    executed_queries : List[Any]
+    fetch_results : list
+    rowcount : int
+    {abstract}close()
+    execute(query: str, params: Tuple[Any, ...])
+    executemany(query: str, params: Tuple[Any, ...])
+    fetchall() -> Optional[List[Any]]
+    fetchone() -> Optional[Any]
+    }
+    class "MockDB"{
+    mock_cursor
+    cursor()
+    }
+    class "MockDatabaseConnection" {
+    autocommit : bool
+    cursor_instance
+    cursor()
+    }
+    class "TestTravelCrud"{
+    crud : travelCRUD
+    db_params : Dict[str, Any]
+    table_name : str
+    finalize()
+    initialize()
+    test_create_schema()
+    test_insert_data_from_list()
+    }
+    class "Asserter" as Asserter {
+    assert_equal(actual: Any, expected: Any, message: str)
+    assert_false(actual: Any, message: str)
+    assert_raises(exception: Exception, callable: Callable[..., Any])
+    assert_true(actual: Any, message: str)
+    }
+    class "TestCase" as TestCase {
+    name : str
+    {abstract}finalize()
+    {abstract}initialize()
+    run() -> bool
+    }
+    class "TestSuite" as TestSuite {
+    tests : List[TestCase]
+    add_test(test: TestCase)
+    do_tests()
+    run() -> Tuple[int, int]
+    }
+
+    MockCursor --* MockDB : mock_cursor
+    MockCursor --* MockDatabaseConnection : cursor_instance
+    MockDatabaseConnection --|> DatabaseConnection
+    TestTravelCrud --|> TestCase
+    TestTravelCrud --> travelCRUD : tests
+    travelCRUD --|> BasicCRUD
+    travelCRUD --> DatabaseConnection : depends on
+    TestSuite ..> TestCase : contains
+    Asserter ..> travelCRUD : uses
+
+@enduml

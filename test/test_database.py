@@ -1,4 +1,7 @@
+from datetime import date
+from inspect import getmembers, ismethod
 from typing import Any, Callable, Dict, List, Optional, Tuple
+from uuid import uuid4
 
 from unit_test_framework import Asserter, TestCase, TestSuite
 
@@ -24,6 +27,9 @@ class MockCursor:
 
     def fetchone(self) -> Optional[Any]:
         return self.fetch_results[0] if self.fetch_results else None
+
+    def close(self):
+        pass
 
 class MockDB:
     def __init__(self):
@@ -59,19 +65,34 @@ class TestTravelCrud(TestCase):
         self.crud = travelCRUD(MockDatabaseConnection,self.db_params,self.table_name)
     
     def finalize(self):
-        self.crud.db().cursor.executed_queries = []          
-        self.crud.db().cursor.fetch_results = []          
+        self.crud.executed_queries_history = []          
+        self.crud.fetch_results_history = []          
     
     def test_create_schema(self):
         self.crud.create_schema()
-        executed_query = self.crud.db().cursor.executed_queries[0][0]
+        executed_query = self.crud.executed_queries_history[-1][0]
         Asserter.assert_true("CREATE TABLE IF NOT EXISTS" in executed_query,"CREATE TABLE query not executed")
         Asserter.assert_true(self.table_name in executed_query, "Table name not in CREATE TABLE query")
+    def test_insert_data_from_list(self):
+        test_data:List[Tuple[Any,...]] = [(
+                str(uuid4()), str(uuid4()), "John Doe", "john@example.com", "1234567890",
+                date(2023, 1, 1), date(2023, 2, 1), date(2023, 2, 15), "Paris", "New York",
+                "FL123", "Hotel Paris", "Double", 1000.00, "Paid", "Credit Card",
+                "Best Travel", "None", "LP12345")
+        ]
+        self.crud.insert_data_from_list(test_data)
+        executed_query,params = self.crud.executed_queries_history[-1]
+        Asserter.assert_true("INSERT INTO" in executed_query, "INSERT query not executed.")
+        Asserter.assert_equal(params,test_data,"Inserted data does not match test data")
+
 
 if __name__ == '__main__':
     test_suite = TestSuite()
     test_methods = [method for method in dir(TestTravelCrud) if method.startswith('test_')]
     for method in test_methods:
         test_suite.add_test(TestTravelCrud(method))
+    class_methods_to_test = [item for item in getmembers(travelCRUD(MockDatabaseConnection,{},''),predicate=ismethod) if not item[0].startswith('_')]
+    print(f"Need to test {len(class_methods_to_test)} different methods for travelCRUD-class.\n--------")
     test_suite.do_tests()
+    print("--------")
     print("nice")

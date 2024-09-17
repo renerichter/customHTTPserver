@@ -1,7 +1,7 @@
 from abc import abstractmethod
 from functools import wraps
 from traceback import TracebackException
-from typing import Any, Callable, Dict, List, Optional, Type
+from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from psycopg2 import connect, extensions, pool, sql
 
@@ -64,6 +64,8 @@ class BasicCRUD:
                         print(f"Error during DB operation: {e}.")
                     finally:
                         # close the cursor to free up memory and resources associated with it after finished querying -> helps prevent memory leaks and keeps database interactions clean
+                        self.executed_queries_history = getattr(cur, 'executed_queries', None)
+
                         cur.close()
                         if autocommit: active_db.autocommit = False
                 return result
@@ -81,11 +83,12 @@ class travelCRUD(BasicCRUD):
         self.db = db
         self.db_params = db_params
         self.table_name = table_name
-    
+        self.executed_queries_history:List[Any] = []
+        self.fetch_results_history:List[Tuple[Any,Any]] = []
+
     @BasicCRUD.db_operation
     def create_schema(self,cur):
-        query = f"""
-        CREATE TABLE IF NOT EXISTS {self.table_name}(
+        query = f"""CREATE TABLE IF NOT EXISTS {self.table_name}(
             booking_id UUID PRIMARY KEY,
             customer_id UUID NOT NULL,
             customer_name VARCHAR(255) NOT NULL,
@@ -113,15 +116,14 @@ class travelCRUD(BasicCRUD):
     @BasicCRUD.db_operation
     def insert_data_from_list(self,cur,data:List[str]):
         """eg create_schema()"""
-        query = f"""
-            INSERT INTO {self.table_name} (booking_id, customer_id,customer_name, email,phone,booking_date,travel_date,return_date,destination,departure_city,flight_number,hotel_name,room_type,total_price, payment_status,payment_method,travel_agency,special_requests,loyalty_program_number)
+        query = f"""INSERT INTO {self.table_name} (booking_id, customer_id,customer_name, email,phone,booking_date,travel_date,return_date,destination,departure_city,flight_number,hotel_name,room_type,total_price, payment_status,payment_method,travel_agency,special_requests,loyalty_program_number)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
         """
         cur.executemany(query,data)
         print(f"Inserted the data into {self.table_name} successfully.")
     
     @BasicCRUD.db_operation
-    def get_email_addresses(self,cur):
+    def get_email_addresses(self,cur,store_history:bool=False):
         query = f"""
             SELECT DISTINCT email
             FROM {self.table_name}
@@ -129,12 +131,12 @@ class travelCRUD(BasicCRUD):
             """
         cur.execute(cur)
         result = cur.fetchall()
+        if store_history: self.fetch_results_history.append((getattr(cur, 'executed_queries', None),result))
         return result
     
     @BasicCRUD.db_operation
     def update_payment_status(self,cur,booking_id:str,new_status:str):
-        query = f"""
-            UPDATE {self.table_name}
+        query = f"""UPDATE {self.table_name}
             SET payment_status = %s
             WHERE booking_id = %s
         """
@@ -143,20 +145,20 @@ class travelCRUD(BasicCRUD):
 
     @BasicCRUD.db_operation
     def delete_booking(self,cur,booking_id:str):
-        query= f"""
-            DELETE FROM {self.table_name}
+        query= f"""DELETE FROM {self.table_name}
             WHERE booking_id = %s
         """
         cur.execute(query,(booking_id,))
         
     @BasicCRUD.db_operation
-    def check_table_exists(self,cur):
+    def check_table_exists(self,cur,store_history:bool=False):
         query=f"""SELECT 1 FROM pg_database WHERE datname = 'sqlalchemy1'"""
         #SELECT * FROM bookings LIMIT 1;
         cur.execute(query,(self.table_name,))
-        res = cur.fetchone()
-        print(f"Test for existance of Database {self.table_name} lead to {res=}.")
-        return res
+        result = cur.fetchone()
+        if store_history: self.fetch_results_history.append((getattr(cur, 'executed_queries', None),result))
+        print(f"Test for existance of Database {self.table_name} lead to {result=}.")
+        return result
         
     @BasicCRUD.db_operation(autocommit=True)
     def delete_database(self,cur):
