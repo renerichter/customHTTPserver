@@ -4,13 +4,15 @@ from app.controller.httpServer import HTTPserver
 #from app.controller.httpClient import HttpClient
 from app.controller.parser import ParserFactory
 from app.model.booking import BookingAnalyzer, BookingManager
-from app.model.database import PostgresqlDB, travelCRUD
+from app.model.cache import LruCache
+from app.model.database import PostgresqlDB, cachedTravelCRUD, travelCRUD
 
 test_booking = False
 test_getRequest = False
 test_crud = False
 test_unitTest = False
-test_httpServer = True
+test_httpServer = False
+test_Cache = True
 
 
 if __name__ == '__main__':
@@ -78,4 +80,15 @@ if __name__ == '__main__':
         server = HTTPserver(crud)
         server.start()
 
+    if test_Cache:
+        db_params:Dict[str,Any]={
+            'host': 'localhost',
+            'port': 5432,
+            'dbname': 'sqlalchemy1',
+            'user': 'admin',
+            'password': 'mypassword'
+        }
+        cachedCrud = cachedTravelCRUD(PostgresqlDB,db_params,'bookings',False,LruCache(20,30))
+        server = HTTPserver(cachedCrud)
+        server.start()
     print("'Elegance is the elimination of excess.' – Bruce Lee")

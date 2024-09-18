@@ -1,0 +1,30 @@
+@startuml classes_06-cache
+set namespaceSeparator none
+class "Cache" as app.model.cache.Cache {
+  {abstract}clear()
+  {abstract}get(key: str) -> Optional[str]
+  {abstract}invalidate(key: str)
+  {abstract}put(key: str, value: str)
+}
+class "LruCache" as app.model.cache.LruCache {
+  age_limit : int
+  cache : OrderedDict[str, Any]
+  capacity : int
+  clear()
+  get(key: str) -> Optional[str]
+  invalidate(key: str)
+  put(key: str, value: str)
+}
+class cachedTravelCRUD{
+  + self.cache
+  + travelCRUD...stuff
+  -- 
+  + get_booking_id() : override
+  + insert_data_from_list() : override
+}
+
+app.model.cache.LruCache --|> app.model.cache.Cache
+HTTPServer *-- cachedTravelCRUD
+cachedTravelCRUD --|> travelCRUD
+cachedTravelCRUD *-- app.model.cache.LruCache
+@enduml
