@@ -1,0 +1,41 @@
+@startuml
+    !define LIGHTBLUE
+    !include styles/style.puml
+
+    class Server {
+        - config:Config
+        - db: DatabaseConnection
+        - Route: list[ResponseHandler]
+        --
+        + run()
+    }
+    class RequestHandler {
+        --
+        + handle_request()
+    }
+    class PostRequestHandler {
+        --
+        + handle_request()
+    }
+    class GetRequestHandler {
+        --
+        + handle_request()
+    }
+    class ResponseHandler {
+        --
+        + create_response()
+    }
+
+    Server --> DatabaseConnection : uses
+    Server --> PostRequestHandler : uses
+    Server --> GetRequestHandler : uses
+    Server --> ResponseHandler : Uses
+    PostRequestHandler --|> RequestHandler
+    GetRequestHandler --|> RequestHandler
+    Server *-- "1..1" Config
+    
+
+    
+@enduml
+
+
