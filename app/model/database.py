@@ -3,9 +3,10 @@ from functools import wraps
 from traceback import TracebackException
 from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
-from psycopg2 import connect, extensions, pool, sql
+from psycopg2 import connect, extensions
 
 from .booking import BookingManager
+from .cache import Cache, LruCache
 
 
 class DatabaseConnection:
@@ -189,7 +190,29 @@ class travelCRUD(BasicCRUD):
         cur.execute(query)
         print(f"Database {self.table_name} dropped successfully, if it existed in the first place.")
 
+class cachedTravelCRUD(travelCRUD):
+    def __init__(self, db: DatabaseConnection, db_params: Dict[str, Any], table_name: str, store_history: bool = False,cache:Optional[Cache]=None):
+        super().__init__(db, db_params, table_name, store_history)
+        self.cache = cache if cache else LruCache(20,30)
 
-
-
-
+    def get_booking_id(self,booking_id:Optional[str]=None,page_size:int=50):
+        if booking_id:
+            cached_booking = self.cache.get(booking_id)
+            if cached_booking:
+                print("Read from cache.")
+                return cached_booking
+            booking = super().get_booking_id(booking_id,page_size)
+            print("Read from DB and wrote to cache.")
+            if booking:
+                self.cache.put(booking_id,booking)
+            return booking
+        else:
+            print("Read from DB.")
+            return super().get_booking_id(booking_id,page_size)
+    
+    def insert_data_from_list(self,data:List[str]):
+        super().insert_data_from_list(data)
+        for booking in data:
+            booking_id = booking[0]
+            self.cache.invalidate(booking_id)
+    

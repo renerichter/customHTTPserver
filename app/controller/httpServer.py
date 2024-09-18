@@ -27,14 +27,17 @@ class GetRequestHandler(RequestHandler):
     def handle_request(self, request: Dict[str, Any]) -> str:
         booking_id = request.get('path').split('/')[-1]
         if booking_id:
-            booking = self.crud.get_booking_id(booking_id)
-            if booking:
-                return booking
+            if "-" in booking_id:
+                booking = self.crud.get_booking_id(booking_id)
+                if booking:
+                    return booking
+                else:
+                    return f"booking_id {booking_id} not found."
             else:
-                return f"booking_id {booking_id} not found."
+                all_booking_ids = self.crud.get_booking_id()
+                return dumps(all_booking_ids)
         else:
-            all_booking_ids = self.crud.get_booking_id()
-            return dumps(all_booking_ids)
+            return "No route matched."
         
 class PostRequestHandler(RequestHandler):
     def __init__(self, crud: BasicCRUD) -> None:
