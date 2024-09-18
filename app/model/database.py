@@ -5,6 +5,8 @@ from typing import Any, Callable, Dict, List, Optional, Tuple, Type
 
 from psycopg2 import connect, extensions, pool, sql
 
+from .booking import BookingManager
+
 
 class DatabaseConnection:
     def __init__(self,host:str,port:int,dbname:str,user:str,password:str)->None:
@@ -65,7 +67,6 @@ class BasicCRUD:
                     finally:
                         # close the cursor to free up memory and resources associated with it after finished querying -> helps prevent memory leaks and keeps database interactions clean
                         self.executed_queries_history = getattr(cur, 'executed_queries', None)
-
                         cur.close()
                         if autocommit: active_db.autocommit = False
                 return result
@@ -79,12 +80,13 @@ class BasicCRUD:
         return decorator
 
 class travelCRUD(BasicCRUD):
-    def __init__(self,db:DatabaseConnection,db_params:Dict[str,Any],table_name:str):
+    def __init__(self,db:DatabaseConnection,db_params:Dict[str,Any],table_name:str,store_history:bool=False):
         self.db = db
         self.db_params = db_params
         self.table_name = table_name
         self.executed_queries_history:List[Any] = []
         self.fetch_results_history:List[Tuple[Any,Any]] = []
+        self.store_history = store_history
 
     @BasicCRUD.db_operation
     def create_schema(self,cur):
@@ -123,15 +125,36 @@ class travelCRUD(BasicCRUD):
         print(f"Inserted the data into {self.table_name} successfully.")
     
     @BasicCRUD.db_operation
-    def get_email_addresses(self,cur,store_history:bool=False):
+    def get_email_addresses(self,cur):
         query = f"""
             SELECT DISTINCT email
             FROM {self.table_name}
             ORDER BY email ASC
             """
-        cur.execute(cur)
+        cur.execute(query)
         result = cur.fetchall()
-        if store_history: self.fetch_results_history.append((getattr(cur, 'executed_queries', None),result))
+        if self.store_history: self.fetch_results_history.append((getattr(cur, 'executed_queries', None),result))
+        return result
+    
+    @BasicCRUD.db_operation
+    def get_booking_id(self,cur,booking_id:Optional[str]=None,page_size:int=50):
+        if booking_id:
+            query = f"""SELECT * 
+                        FROM {self.table_name} 
+                        WHERE booking_id = %s
+                        """
+            cur.execute(query,(booking_id,))
+            result = cur.fetchone()
+            result = BookingManager().convert_params_to_booking(result).json()
+        else:
+            query = f"""SELECT booking_id
+                        FROM {self.table_name} 
+                        LIMIT %s;
+                        """
+            cur.execute(query,(page_size,))
+            result = cur.fetchall()
+            result = [{'booking_id':res[0]} for res in result]
+        if self.store_history: self.fetch_results_history.append((getattr(cur, 'executed_queries', None),result))
         return result
     
     @BasicCRUD.db_operation
@@ -151,12 +174,12 @@ class travelCRUD(BasicCRUD):
         cur.execute(query,(booking_id,))
         
     @BasicCRUD.db_operation
-    def check_table_exists(self,cur,store_history:bool=False):
+    def check_table_exists(self,cur):
         query=f"""SELECT 1 FROM pg_database WHERE datname = 'sqlalchemy1'"""
         #SELECT * FROM bookings LIMIT 1;
         cur.execute(query,(self.table_name,))
         result = cur.fetchone()
-        if store_history: self.fetch_results_history.append((getattr(cur, 'executed_queries', None),result))
+        if self.store_history: self.fetch_results_history.append((getattr(cur, 'executed_queries', None),result))
         print(f"Test for existance of Database {self.table_name} lead to {result=}.")
         return result
         
@@ -165,6 +188,8 @@ class travelCRUD(BasicCRUD):
         query=f"""DROP DATABASE IF EXISTS {self.table_name}"""
         cur.execute(query)
         print(f"Database {self.table_name} dropped successfully, if it existed in the first place.")
+
+
 
 
 

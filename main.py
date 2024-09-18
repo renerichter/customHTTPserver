@@ -1,5 +1,6 @@
 from typing import Any, Dict
 
+from app.controller.httpServer import HTTPserver
 #from app.controller.httpClient import HttpClient
 from app.controller.parser import ParserFactory
 from app.model.booking import BookingAnalyzer, BookingManager
@@ -7,7 +8,10 @@ from app.model.database import PostgresqlDB, travelCRUD
 
 test_booking = False
 test_getRequest = False
-test_crud = True
+test_crud = False
+test_unitTest = False
+test_httpServer = True
+
 
 if __name__ == '__main__':
     print("こんにちは！元気ですか?")
@@ -62,6 +66,16 @@ if __name__ == '__main__':
         # delete 1 entry
         crud.delete_booking('625cd3c9-0116-452f-816c-91aa6e236110')
         
-        
+    if test_httpServer:
+        db_params:Dict[str,Any]={
+            'host': 'localhost',
+            'port': 5432,
+            'dbname': 'sqlalchemy1',
+            'user': 'admin',
+            'password': 'mypassword'
+        }
+        crud = travelCRUD(PostgresqlDB,db_params,'bookings')
+        server = HTTPserver(crud)
+        server.start()
 
     print("'Elegance is the elimination of excess.' – Bruce Lee")

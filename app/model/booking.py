@@ -45,9 +45,12 @@ class BookingManager:
         self._bookings:List[Booking] = bookings
         self._booking_fields:List[str] = list(Booking.model_fields.keys())
     
+    def convert_params_to_booking(self,booking_values:List[Any]):
+        return Booking(**dict(zip(self._booking_fields,booking_values)))
+    
     def add_bookings(self,bookings:List[List[str]])->None:
         assert isinstance(bookings[0][0],str), "No list of strings given or degree of list nesting not matching"
-        self._bookings+=[Booking(**dict(zip(self._booking_fields,item))) for item in bookings]
+        self._bookings+=[self.convert_params_to_booking(item) for item in bookings]
     
     def add_booking(self,booking:List[str])->None:
         self._bookings.append(Booking(*booking))

@@ -1,0 +1,42 @@
+@startuml classes_05-syncHTTPserver
+!define LIGHTBLUE
+!include styles/style.puml
+set namespaceSeparator none
+class "GetRequestHandler" as GetRequestHandler {
+  crud : BasicCRUD
+  handle_request(request: Dict[str, Any]) -> str
+}
+class "HTTPserver" as HTTPserver {
+  +config
+  +crud : BasicCRUD
+  +handler_factory
+  create_response(status_code: int, body: str) -> str
+  handle_request(request: str) -> str
+  +start()
+}
+class "PostRequestHandler" as PostRequestHandler {
+  +crud : BasicCRUD
+  handle_request(request: Dict[str, Any]) -> str
+}
+class "RequestHandler" as RequestHandler {
+  +{abstract}handle_request(request: Dict[str, Any]) -> str
+}
+class "RequestHandlerFactory" as RequestHandlerFactory {
+  +crud : BasicCRUD
+  --
+  +create_handler(method: str) -> RequestHandler
+}
+class "ServerConfig" as ServerConfig {
+  -_instance
+}
+class travelCRUD{
+  ...
+}
+GetRequestHandler --|> RequestHandler
+PostRequestHandler --|> RequestHandler
+RequestHandlerFactory --* HTTPserver : handler_factory
+RequestHandlerFactory --> GetRequestHandler:uses
+RequestHandlerFactory --> PostRequestHandler:uses
+travelCRUD --* HTTPserver
+ServerConfig --* HTTPserver
+@enduml
