@@ -25,8 +25,8 @@ class TestHTTPServer:
 
 if __name__ == '__main__':
     client = TestHTTPServer("http://localhost",8181)
-    #client.get_booking()
-    #client.get_booking('fb6b3247-7a34-48d3-8611-99dd0eb600b1')
+    client.get_booking()
+    client.get_booking('fb6b3247-7a34-48d3-8611-99dd0eb600b1')
     
     new_booking:Dict[str,Any] = {
         "booking_id": str(uuid4()),
