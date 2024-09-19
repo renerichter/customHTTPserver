@@ -24,7 +24,7 @@ First approach
 - start with a simple lruCache in pc-memory
     - implement from general Caching-Class and provide via dependency injection during runtime to database
     - test with multi-query using [httpClient](../app/controller/httpClient.py)
-    - implement using OrderedDict -> even though not intuitive for me, newest at the end and pop(0) least used seems industry-standard
+    - implement using [OrderedDict](https://docs.python.org/3/library/collections.html#collections.OrderedDict) -> even though not intuitive for me, newest at the end and pop(0) least used seems industry-standard
         - > "To place the important in the right order is to avoid unnecessary complexity." — Zhuangzi 😜
 
 Regarding the cache invalidation and eviction policy:

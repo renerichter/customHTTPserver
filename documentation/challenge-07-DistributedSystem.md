@@ -11,4 +11,11 @@
 
 ## The Solution
 
-???
+### Basic Idea
+
+- hardware-abstraction = Node (runs instance of HTTP-server)
+- LoadBalancer -> RoundRobin, Random, WeightedRoundRobin -> decides where to send request
+- DistributedBookingSystem -> distributes requests among nodes
+- central DB, connected to by all nodes individually -> concurrency!
+
+
