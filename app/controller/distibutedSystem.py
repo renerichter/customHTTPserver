@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from threading import Thread
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
-from ..model.database import travelCRUD
+from ..model.database import DatabaseConnection, travelCRUD
 from .httpServer import HTTPserver
+from .names import CreativeNamer
 
 
 class Node:
@@ -59,11 +60,17 @@ class WeightedRoundRobin(LoadBalancer):
     pass
 
 class DistributedBookingSystem:
-    def __init__(self):
-        pass
+    def __init__(self,db:DatabaseConnection, db_params: Dict[str,Any], table_name:str):
+        self._nodes:List[Node] = []
+        self._load_balancer: Optional[LoadBalancer] = None
+        self._db = db
+        self._db_params = db_params
+        self._table_name = table_name
+        self._namer = CreativeNamer()
     
     def add_node(self,host:str,port:int):
-        pass
+        crud = cachedTravelCRUD(self._db,self._db_params,self._table_name)
+        node = Node(crud,host,port,self._namer.create_name(1))
     
     def start(self):
         pass

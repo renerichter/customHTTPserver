@@ -215,4 +215,17 @@ class cachedTravelCRUD(travelCRUD):
         for booking in data:
             booking_id = booking[0]
             self.cache.invalidate(booking_id)
-    
+
+class CrudFactory:
+    def __init__(self):
+        pass
+    def create_crud(self,crud:str,*params):
+        crud_options = ["basic","travel","cachedTravel"]
+        if crud == crud_options[0]:
+            return BasicCRUD
+        elif crud == crud_options[1]:
+            return travelCRUD(*params)
+        elif crud == crud_options[2]:
+            return cachedTravelCRUD(*params)
+        else:
+            raise ValueError(f"Crud type not found. Maybe misspelled? The options are:\n>{",".join(crud_options)}")
