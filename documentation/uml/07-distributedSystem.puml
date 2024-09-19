@@ -1,0 +1,46 @@
+@startuml classes_07-distributedSystem
+set namespaceSeparator none
+class "DistributedBookingSystem" as DistributedBookingSystem {
+  add_node(host: str, port: int)
+  delete_node(node_id: int)
+  forward_data(reader: StreamReader, writer: StreamWriter, task_id: str)
+  get_status()
+  handle_client(reader: StreamReader, writer: StreamWriter)
+  run()
+  set_load_balancer(balancer_type: str)
+  start()
+  stop()
+  stop_node(node_id: int)
+}
+class "LoadBalancer" as LoadBalancer {
+  {abstract}get_next_node() -> NodeConnection
+  {abstract}update_nodes_list(new_connections: List[NodeConnection])
+}
+class "Node" as Node {
+  get_short_info()
+  start()
+  stop()
+}
+class "NodeConnection" as NodeConnection {
+  close()
+  connect()
+  is_open()
+}
+class "RandomBalancer" as RandomBalancer {
+}
+class "RoundRobinBalancer" as RoundRobinBalancer {
+  get_next_node() -> NodeConnection
+  update_nodes_list(new_connections: List[NodeConnection])
+}
+class "WeightedRoundRobin" as WeightedRoundRobin {
+}
+RandomBalancer --|> LoadBalancer
+RoundRobinBalancer --|> LoadBalancer
+WeightedRoundRobin --|> LoadBalancer
+RoundRobinBalancer --* DistributedBookingSystem : _load_balancer
+Node --* DistributedBookingSystem
+NodeConnection --* DistributedBookingSystem
+HTTPServer --* Node
+cachedTravelCrud --* Node
+cachedTravelCrud --* DistributedBookingSystem
+@enduml

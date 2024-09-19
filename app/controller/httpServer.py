@@ -10,7 +10,8 @@
 """
 from abc import ABC, abstractmethod
 from json import dumps, loads
-from typing import Any, Dict, Union
+from socket import AF_INET, SOCK_STREAM, socket
+from typing import Any, Dict, Optional, Union
 
 from ..model.database import BasicCRUD, travelCRUD
 
@@ -67,29 +68,38 @@ class RequestHandlerFactory:
                 raise ValueError(f"Unsupported HTTP-method: {method}.")
 
 class ServerConfig:
-    _instance = None
+    _instance = {}
     
-    def __new__(cls): # host:str=,port:int=
-        if cls._instance is None:
-            cls._instance = super(ServerConfig,cls).__new__(cls)
-            cls._instance.host = 'localhost'
-            cls._instance.port = 8181
-        return cls._instance
+    def __new__(cls,host:Optional[str]=None,port:Optional[int]=None): # host:str=,port:int=
+        host = host if host else 'localhost'
+        port = port if port else 8181
+        key = (host,port)
+        if key not in cls._instance:
+            cls._instance[key] = super(ServerConfig,cls).__new__(cls)
+            cls._instance[key].host = host
+            cls._instance[key].port = port
+        return cls._instance[key]
 
 class HTTPserver:
-    def __init__(self, crud: BasicCRUD):
-        self.config = ServerConfig()
+    def __init__(self, crud: BasicCRUD,host:Optional[str]=None,port:Optional[int]=None):
+        self.config = ServerConfig(host,port)
         self.crud = crud
         self.handler_factory = RequestHandlerFactory(self.crud,)
+        self._running = False
+        self._active_socket = None
     
     def start(self):
-        from socket import AF_INET, SOCK_STREAM, socket
-        with socket(AF_INET,SOCK_STREAM) as active_socket:
-            active_socket.bind((self.config.host,self.config.port))
-            active_socket.listen()
+        with socket(AF_INET,SOCK_STREAM) as self._active_socket:
+            self._active_socket.bind((self.config.host,self.config.port))
+            self._active_socket.listen()
             print(f"Server listening on {self.config.host}:{self.config.port}.")
-            while True:
-                conn,addr = active_socket.accept()
+            self.running = True
+            while self.running:
+                self._active_socket.settimeout(1)
+                try:
+                    conn,addr = self._active_socket.accept()
+                except TimeoutError:
+                    continue # start anew
                 with conn:
                     print(f"Connected by {addr}.")
                     data = conn.recv(1024) #standard buffer size for messaging and simple file-transfer -> for big-files change to 8192bytes or more
@@ -97,6 +107,11 @@ class HTTPserver:
                         break
                     response = self.handle_request(data.decode('utf-8'))
                     conn.sendall(response.encode('utf-8'))
+    def stop(self):
+        print("Stopping server...")
+        self.running=False
+        if self._active_socket:
+            self._active_socket.close()
     
     def handle_request(self,request:str) -> str:
         request_lines = request.split('\n')

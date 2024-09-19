@@ -13,9 +13,10 @@ class TestHTTPServer:
         url = f"{self.base_url}/booking"
         if booking_id:
             url+= f"/{booking_id}"
-        response = get(url)
-        print(f"GET Response: {response.status_code}")
-        print(response.json())
+        headers = {'Connection':'close'}
+        with get(url,headers=headers) as response:
+            print(f"GET Response: {response.status_code}")
+            print(response.json())
     
     def create_booking(self,booking_data:Dict[str,Any]):
         url = f"{self.base_url}/booking"
@@ -34,6 +35,7 @@ if __name__ == '__main__':
     for i in range(30):
         booking_ids_used.append(booking_ids[randint(0,len(booking_ids)-1)]['booking_id'])
         client.get_booking(booking_ids_used[-1])
+        print(f"R{i:02}✅")
     print(booking_ids_used)
     
     new_booking:Dict[str,Any] = {
