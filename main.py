@@ -1,5 +1,7 @@
+from threading import Thread
 from typing import Any, Dict
 
+from app.controller.distibutedSystem import DistributedBookingSystem
 from app.controller.httpServer import HTTPserver
 #from app.controller.httpClient import HttpClient
 from app.controller.parser import ParserFactory
@@ -12,8 +14,16 @@ test_getRequest = False
 test_crud = False
 test_unitTest = False
 test_httpServer = False
-test_Cache = True
+test_Cache = False
+test_LoadBalancing = True
 
+postgres_db_params:Dict[str,Any]={
+            'host': 'localhost',
+            'port': 5432,
+            'dbname': 'sqlalchemy1',
+            'user': 'admin',
+            'password': 'mypassword'
+        }
 
 if __name__ == '__main__':
     print("こんにちは！元気ですか?")
@@ -39,13 +49,7 @@ if __name__ == '__main__':
         parsed_result= parser.parse_one(result)
         print(parsed_result)
     if test_crud:
-        db_params:Dict[str,Any]={
-            'host': 'localhost',
-            'port': 5432,
-            'dbname': 'sqlalchemy1',
-            'user': 'admin',
-            'password': 'mypassword'
-        }
+        db_params=postgres_db_params
         crud = travelCRUD(PostgresqlDB,db_params,'bookings')
         
         file_path = 'data/travel_bookings.csv'
@@ -69,26 +73,36 @@ if __name__ == '__main__':
         crud.delete_booking('625cd3c9-0116-452f-816c-91aa6e236110')
         
     if test_httpServer:
-        db_params:Dict[str,Any]={
-            'host': 'localhost',
-            'port': 5432,
-            'dbname': 'sqlalchemy1',
-            'user': 'admin',
-            'password': 'mypassword'
-        }
+        db_params=postgres_db_params
         crud = travelCRUD(PostgresqlDB,db_params,'bookings')
         server = HTTPserver(crud)
         server.start()
 
     if test_Cache:
-        db_params:Dict[str,Any]={
-            'host': 'localhost',
-            'port': 5432,
-            'dbname': 'sqlalchemy1',
-            'user': 'admin',
-            'password': 'mypassword'
-        }
+        db_params=postgres_db_params
         cachedCrud = cachedTravelCRUD(PostgresqlDB,db_params,'bookings',False,LruCache(20,30))
         server = HTTPserver(cachedCrud)
         server.start()
+    
+    if test_LoadBalancing:
+        db = PostgresqlDB
+        db_params = postgres_db_params
+        table_name = 'bookings'
+        cache = LruCache(20,30)
+        host="localhost"
+        # make sure port range isn't used -> in bash `lsof -i -P -n | grep LISTEN``
+
+        base_port=8181
+        distributed_system = DistributedBookingSystem(host,base_port,db,db_params,table_name)
+        
+        for i in range(1,6):
+            distributed_system.add_node(host,base_port+i)
+        distributed_system.set_load_balancer("roundrobin")
+        
+        distributed_system.run()
+        #running_system = Thread(target=distributed_system.run)
+        #running_system.start()
+        #print(running_system.is_alive())
+        print(distributed_system.get_status())
+        
     print("'Elegance is the elimination of excess.' – Bruce Lee")

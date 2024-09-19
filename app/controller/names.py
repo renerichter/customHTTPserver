@@ -3,7 +3,7 @@ from typing import List, Optional
 
 
 class CreativeNamer:
-    def __init__(self,adjectives:Optional[List[str]],nouns:Optional[List[str]]):
+    def __init__(self,adjectives:Optional[List[str]]=None,nouns:Optional[List[str]]=None):
         self.adjectives = adjectives if adjectives else self.get_default_adjectives()
         self.nouns = nouns if nouns else self.get_default_nouns()
     
