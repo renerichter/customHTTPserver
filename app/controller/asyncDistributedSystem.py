@@ -1,8 +1,11 @@
 import asyncio
+import time
 from abc import ABC, abstractmethod
 from asyncio import StreamReader, StreamWriter
 from logging import INFO, basicConfig, getLogger
 from typing import Any, Dict, List, Tuple
+
+import psutil
 
 from ..model.database import DatabaseConnection, cachedTravelCRUD
 from .asyncHttpServer import AsyncHttpServer
@@ -38,6 +41,36 @@ class asyncNode:
         
         logger.info("%s\n------->>-------Bye 😜------->>-------\n",self)
         
+    
+    async def health_check(self) -> bool:
+        try:
+            cpu_usage = psutil.cpu_percent(interval=1) 
+            mem_available = psutil.virtual_memory().available /1024/1024
+            return cpu_usage < 90 and mem_available > 100
+        except Exception as e: 
+            logger.error("Health check failed for node %s on port %d: %s",self._name,self.port,str(e),exc_info=True)
+            return False
+        
+    async def health_report(self):
+        start_time=time.perf_counter()
+        cpu_usage = psutil.cpu_percent(interval=1) 
+        mem_usage = psutil.virtual_memory().percent
+        mem_available = psutil.virtual_memory().available / (1024 * 1024)
+        disk_usage = psutil.disk_usage('/').percent        
+        
+        await asyncio.sleep(0.1)
+        # health check latency
+        latency = (time.perf_counter() -start_time)*1000 #ms
+        
+        return {
+            "cpu_usage": cpu_usage,
+            "ram_usage": mem_usage,
+            "ram_available": mem_available,
+            "disk_usage": disk_usage,
+            "latency_ms": latency
+        }
+
+    
     def __str__(self):
         return f"Node ~*>{self._name}<*~ running on {self.host}:{self.port}"
 
@@ -48,6 +81,14 @@ class asyncLoadBalancer(ABC):
 
     @abstractmethod
     def update_nodes_list(self,new_nodes:List[asyncNode]):
+        pass
+    
+    @abstractmethod
+    async def do_health_checks(self)->List[asyncNode]:
+        pass
+
+    @abstractmethod
+    async def get_health_reports(self) -> Dict[str,Dict[str,Any]]:
         pass
 
 class asyncRoundRobinBalancer(asyncLoadBalancer):
@@ -66,6 +107,23 @@ class asyncRoundRobinBalancer(asyncLoadBalancer):
     def update_nodes_list(self,new_nodes:List[asyncNode]):
         self._nodes = new_nodes
         self._current_idx = self._current_idx % len(new_nodes)
+
+    async def do_health_checks(self)->List[asyncNode]:
+        death_book:List[asyncNode] = []
+        for node in self._nodes: 
+            if not await node.health_check():
+                death_book.append(node)
+        
+        for node in death_book:
+            self._nodes.remove(node)
+        return death_book
+    
+    async def get_health_reports(self) -> Dict[str, Dict[str, Any]]:
+        reports:Dict[str, Dict[str, Any]] = {}
+        for node in self._nodes:
+            reports[node._name] = await node.health_report()
+        return reports
+            
 
 
 class asyncDistributedBookingSystem:
@@ -120,6 +178,7 @@ class asyncDistributedBookingSystem:
         self._server = await asyncio.start_server(self.handle_connection,self.host,self.port)
         self._is_running = True
         logger.info("DBS ---> Listening on %s:%d.",self.host,self.port)
+        asyncio.create_task(self.health_check_routine())
 
         async with self._server:
             await self._server.serve_forever()    
@@ -165,7 +224,22 @@ class asyncDistributedBookingSystem:
             writer.close()
             await writer.wait_closed()
         
-        
+    async def replace_dead_nodes(self,dead_nodes:List[asyncNode]):
+        for node in dead_nodes: 
+            host,port = node.host, node.port
+            await node.stop()
+            self.add_node(host,port)
+
+    async def health_check_routine(self):
+        dead_nodes:List[asyncNode] = []
+        while self._is_running:
+            dead_nodes = await self._load_balancer.do_health_checks()
+            if dead_nodes:
+                await self.replace_dead_nodes(len(dead_nodes))
+            health_reports = await self._load_balancer.get_health_reports()
+            logger.info("Health Reports: %s",health_reports)
+            await asyncio.sleep(60)
+                    
 
     def get_status(self):
         #  [b for b in dir(a) if b.startswith("_") and not b.startswith("__")]
