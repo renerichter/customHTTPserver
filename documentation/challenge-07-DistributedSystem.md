@@ -17,6 +17,7 @@
 - updated [HttpClient](../app/controller/httpClient.py)-testing slightly 
 - update [httpServer](../app/controller/httpServer.py)
 - create fancy names for nodes in via [CreativeNamer](../app/controller/names.py) class
+    - leading to welcome messages like `Hello. This is serendipitous fantastical Galaxy. Let's go!`
 - create [manyClients](../app/controller/manyClients.py) to run multiple httpClients
 
 ### Basic Idea

@@ -215,6 +215,7 @@ class cachedTravelCRUD(travelCRUD):
         for booking in data:
             booking_id = booking[0]
             self.cache.invalidate(booking_id)
+            self.cache.put(booking_id,booking)
 
 class CrudFactory:
     def __init__(self):

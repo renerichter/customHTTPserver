@@ -32,7 +32,7 @@ class LruCache(Cache):
         self.age_limit = age_limit
     
     def get(self,key:str) -> Optional[str]:
-        if key in self.cache and self.cache[key][1] <= self.age_limit:
+        if key in self.cache and time()-self.cache[key][1] <= self.age_limit:
             self.cache.move_to_end(key)
             return self.cache[key][0]
         else:

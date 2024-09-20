@@ -11,4 +11,14 @@
 
 ## The Solution
 
-???
+### Files Changed
+
+### Basic Idea
+
+- Q1: Where is the bottle-neck and which tasks do need to be in a task-queue? 
+    - `DistributedBookingSystem`
+    - each `Node`
+    - but problem: if taskQueue leads to DistributedBookingSystem task need to wait before execution then process could be clodes due to `asyncio.wait_for`-statement around `asyncio.gather` in `DistributedBookingSystem.handle_client`
+    - so for now: 1 for DistributedBookingSystem
+- On this addition also
+    - ✅test caching -> what is in the cache and why is it not re-used -> test with all the same entries.
