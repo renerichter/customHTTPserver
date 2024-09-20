@@ -1,12 +1,12 @@
+import asyncio
 from logging import INFO, basicConfig, getLogger
-from threading import Thread
 from typing import Any, Dict
 
+from app.controller.asyncDistributedSystem import asyncDistributedBookingSystem
 from app.controller.distibutedSystem import DistributedBookingSystem
 from app.controller.httpServer import HTTPserver
 #from app.controller.httpClient import HttpClient
 from app.controller.parser import ParserFactory
-from app.controller.taskQueue import TaskQueue
 from app.model.booking import BookingAnalyzer, BookingManager
 from app.model.cache import LruCache
 from app.model.database import PostgresqlDB, cachedTravelCRUD, travelCRUD
@@ -123,23 +123,23 @@ def test_LoadBalancing_func()->None:
     print(distributed_system.get_status())
     logger.info('LoadBalancing test: Done.')
 
-def test_TaskQueue_func()->None:
+async def test_TaskQueue_func()->None:
     logger.info('TaskQueue test: Started.')
     db = PostgresqlDB
     db_params = postgres_db_params
     table_name = 'bookings'
     host="localhost"
     base_port=8181
-    task_queue = TaskQueue(3,20)
-    distributed_system = DistributedBookingSystem(host,base_port,db,db_params,table_name,task_queue)
+    q_params = (3,5)
+    dbs = asyncDistributedBookingSystem(host,base_port,db,db_params,table_name,q_params)
     
     for i in range(1,6):
-        distributed_system.add_node(host,base_port+i)
-    distributed_system.set_load_balancer("roundrobin")
+        dbs.add_node(host,base_port+i)
+    dbs.set_load_balancer("roundrobin")
     
-    distributed_system.run()
+    await dbs.start()
     
-    print(distributed_system.get_status())
+    print(dbs.get_status())
     logger.info('TaskQueue test: Done.')
 
 if __name__ == '__main__':
@@ -152,6 +152,6 @@ if __name__ == '__main__':
     if test_httpServer:     test_httpServer_func()
     if test_cache:          test_cache_func()
     if test_LoadBalancing:  test_LoadBalancing_func()
-    if test_TaskQueue:      pass
+    if test_TaskQueue:      asyncio.run(test_TaskQueue_func())
 
     print("'Elegance is the elimination of excess.' – Bruce Lee")

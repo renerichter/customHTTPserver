@@ -1,0 +1,71 @@
+@startuml classes_08-asyncDistributedSystem
+set namespaceSeparator none
+class "asyncDistributedBookingSystem"{
+  host : str
+  port : int
+  add_node(host: str, port: int)
+  delete_node(node_id: int)
+  forward_data(data: bytes, node: asyncNode)
+  get_status()
+  handle_connection(reader: StreamReader, writer: StreamWriter)
+  set_load_balancer(balancer_type: str)
+  start()
+  stop()
+  stop_node(node_id: int)
+}
+class "asyncLoadBalancer"{
+  {abstract}get_next_node() -> asyncNode
+  {abstract}update_nodes_list(new_nodes: List[asyncNode])
+}
+class "asyncNode"{
+  host : str
+  port : int
+  task_queue : TaskQueue
+  start()
+  stop()
+}
+class "asyncRoundRobinBalancer"{
+  get_next_node() -> asyncNode
+  update_nodes_list(new_nodes: List[asyncNode])
+}
+class "AsyncHttpServer"{
+  config : ServerConfig
+  crud : BasicCRUD
+  handler_factory : RequestHandlerFactory
+  host : Optional[str]
+  port : Optional[int]
+  task_queue : TaskQueue
+  create_response(status_code: int, body: str) -> str
+  handle_request(reader: StreamReader, writer: StreamWriter)
+  process_request(request: str) -> str
+  send_confirmation(booking_id: str, address: str) -> int
+  start()
+  stop()
+}
+class "Task"{
+  args : tuple[Any]
+  delay : float
+  dependent_task : Optional['Task']
+  func : Callable[..., Any]
+  kwargs : dict[str, Any]
+  max_retries : int
+  retries : int
+}
+class "TaskQueue" {
+  is_running : bool
+  workers
+  add_task(func: Callable[..., Any])
+  run_worker(worker_id: int)
+  start()
+  stop()
+}
+
+
+asyncRoundRobinBalancer --|> asyncLoadBalancer
+asyncRoundRobinBalancer --* asyncDistributedBookingSystem : _load_balancer
+asyncNode --> TaskQueue : uses
+asyncNode --* asyncDistributedBookingSystem : _load_balancer
+AsyncHttpServer --* asyncNode: uses
+Task --* TaskQueue  : uses
+
+@enduml

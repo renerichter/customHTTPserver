@@ -58,9 +58,7 @@ class TaskQueue:
                     logger.error("Task %s failed after %d retries",task.func.__name__,task.max_retries)
             finally:
                 self._queue.task_done()
-                
 
-        
     async def start(self):    
         self.is_running = True
         self.workers = [asyncio.create_task(self.run_worker(i)) for i in range(self._nworkers)]
