@@ -64,13 +64,14 @@ class BasicCRUD:
                         if cur.rowcount >=0:
                             print(f"{cur.rowcount} rows affected by transformation.")
                     except Exception as e:
-                        print(f"Error during DB operation: {e}.")
+                        result = f"Error during DB operation: {e}."
+                        print(result)
                     finally:
                         # close the cursor to free up memory and resources associated with it after finished querying -> helps prevent memory leaks and keeps database interactions clean
                         self.executed_queries_history = getattr(cur, 'executed_queries', None)
                         cur.close()
                         if autocommit: active_db.autocommit = False
-                return result
+                return result if result else None
             return wrapper
             
         if callable(autocommit):
@@ -215,6 +216,7 @@ class cachedTravelCRUD(travelCRUD):
         for booking in data:
             booking_id = booking[0]
             self.cache.invalidate(booking_id)
+            self.cache.put(booking_id,booking)
 
 class CrudFactory:
     def __init__(self):
@@ -228,4 +230,4 @@ class CrudFactory:
         elif crud == crud_options[2]:
             return cachedTravelCRUD(*params)
         else:
-            raise ValueError(f"Crud type not found. Maybe misspelled? The options are:\n>{",".join(crud_options)}")
+            raise ValueError(f"Crud type not found. Maybe misspelled? The options are:\n>'{"' , '".join(crud_options)}'.")

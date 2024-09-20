@@ -17,6 +17,8 @@
 - updated [HttpClient](../app/controller/httpClient.py)-testing slightly 
 - update [httpServer](../app/controller/httpServer.py)
 - create fancy names for nodes in via [CreativeNamer](../app/controller/names.py) class
+    - leading to welcome messages like `Hello. This is serendipitous fantastical Galaxy. Let's go!`
+- create [manyClients](../app/controller/manyClients.py) to run multiple httpClients
 
 ### Basic Idea
 
@@ -29,3 +31,4 @@
 
 - it took me quite a while to make asyncio (server-side) and sockets (client side) work properly together as closing the connection on client side is/was a problem for me
 - finally introduced a hard waiting time and re-init of a connection on server side --> but: slows down the system response speed -> including the query respone is $<=150ms$ right now, but if a big query or inserting operation is used line `await asyncio.wait_for(asyncio.gather(client_task, node_task), timeout=0.2)` in `DistributedBookingSystem.handle_client(...)` will become a big problem
+- when running 10 clients the probability is high that the same node has the same DB-entry/query in its LRUCache, but when checking the cli **all reads are from DB -> why???**

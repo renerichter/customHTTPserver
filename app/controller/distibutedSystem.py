@@ -1,7 +1,7 @@
 import asyncio
 from abc import ABC, abstractmethod
 from asyncio import StreamReader, StreamWriter
-from socket import AF_INET, SOCK_STREAM, socket
+from queue import Queue
 from threading import Thread
 from typing import Any, Dict, List
 
@@ -9,6 +9,9 @@ from ..model.database import DatabaseConnection, cachedTravelCRUD
 from .httpServer import HTTPserver
 from .names import CreativeNamer
 
+
+class TaskQueue:
+    pass
 
 class Node:
     def __init__(self,crud:cachedTravelCRUD,host:str,port:int,node_name:str,node_id:int):
