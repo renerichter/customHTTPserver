@@ -7,7 +7,7 @@ from uuid import uuid4
 import aiohttp
 from names import CreativeNamer
 
-test_cache = True
+test_cache = False
 
 class TestAsyncHttpServer:
     def __init__(self,url:str,port:int):
@@ -47,7 +47,7 @@ async def main():
     booking_ids_used = [{'booking_id': 'cda20bf0-06f0-47ee-ad46-c5ed670af9e0'},]*booking_length if test_cache else choices(booking_ids,booking_length)
         
     for i in range(booking_length):
-        sleep(0.01+random()*1.2)
+        sleep(0.5+random()*5)
         await client.get_booking(booking_ids_used[i]['booking_id'])
         print(f"{client_name}--->R{i:02}--->✅")
     print(booking_ids_used)

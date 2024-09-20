@@ -7,8 +7,11 @@
 
 ## The UML Diagram
 
-???
+same as [Challenge 08](./challenge-08-TaskQueue.md)
 
 ## The Solution
 
-???
+### Code Updates
+
+- added `asyncNode.health_check` and `asyncNode.health_report` which get checked and reported by `asyncLoadBalancer` via `do_health_checks` and `get_health_reports` functions
+- then added `health_check_routine` to `asyncDistributedBookingSystem.start()` to from time to time check on the `asynNode`s and replace them if necessary using `replace_dead_nodes` function
