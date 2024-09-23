@@ -16,7 +16,7 @@ The Challenges range from Easy (🍏) to expert (🛰️) and become more diffic
 * ✅ [🏗️08 -- Custom Asynchronous Task Queue](./documentation/challenge-08-TaskQueue.md)
 * ✅ [🛰️09 -- Custom Load Balancer Implementation](./documentation/challenge-09-LoadBalancer.md)
 * [🛰️10 -- Manual Authentication and Authorization System](./documentation/challenge-10-Authentication.md)
-* [🛰️11 -- Advanced Logging with Distributed Traceability](./documentation/challenge-11-Logging.md)
+* ⍻ [🛰️11 -- Advanced Logging with Distributed Traceability](./documentation/challenge-11-Logging.md)
 * [🛰️12 -- Real-Time Monitoring with Custom Performance Metrics Dashboard](./documentation/challenge-12-Monitoring.md)
 
 ---
