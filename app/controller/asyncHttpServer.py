@@ -9,18 +9,83 @@
     - use existing connector
 """
 import asyncio
+from abc import ABC, abstractmethod
 from asyncio import StreamReader, StreamWriter
 from json import loads as json_loads
 from logging import Logger
 from random import randint
-from time import perf_counter
-from typing import Any, Dict, Optional
+from time import perf_counter, time
+from typing import Any, Dict, Optional, Union
 
 from ..model.database import BasicCRUD
-from .httpServer import RequestHandlerFactory, ServerConfig
 from .logger import RequestContext
+from .monitoring import PerformanceParams
 from .taskQueue import TaskQueue
 
+
+class RequestHandler(ABC):
+    @abstractmethod
+    def handle_request(self,request: Dict[str,Any])->str:
+        pass
+
+class GetRequestHandler(RequestHandler):
+    def __init__(self,crud: BasicCRUD):
+        self.crud = crud
+    
+    def handle_request(self, request: Dict[str, Any]) -> str:
+        booking_id = request.get('path').split('/')[-1]
+        if booking_id:
+            if "-" in booking_id:
+                booking = self.crud.get_booking_id(booking_id)
+                if booking:
+                    return booking
+                else:
+                    return f"booking_id {booking_id} not found."
+            else:
+                all_booking_ids = self.crud.get_booking_id()
+                return dumps(all_booking_ids)
+        else:
+            return "No route matched."
+        
+class PostRequestHandler(RequestHandler):
+    def __init__(self, crud: BasicCRUD) -> None:
+        self.crud = crud
+    
+    def handle_request(self, request: Dict[str, Any]) -> str:
+        booking_data = request.get('booking')
+        if booking_data:
+            if not isinstance(booking_data,Union[tuple,list]): booking_data = [booking_data,]
+            booking_list = [list(item.values()) for item in booking_data]
+            self.crud.insert_data_from_list(booking_list)
+            return "Booking created successfully"
+        else:
+            return "Invalid Booking data."
+
+class RequestHandlerFactory:
+    def __init__(self, crud: BasicCRUD):
+        self.crud = crud
+    
+    def create_handler(self, method:str) -> RequestHandler:
+        match method:
+            case 'GET':
+                return GetRequestHandler(self.crud)
+            case 'POST':
+                return PostRequestHandler(self.crud)
+            case _:
+                raise ValueError(f"Unsupported HTTP-method: {method}.")
+
+class ServerConfig:
+    _instance = {}
+    
+    def __new__(cls,host:Optional[str]=None,port:Optional[int]=None)->object: # host:str=,port:int=
+        host = host if host else 'localhost'
+        port = port if port else 8181
+        key = (host,port)
+        if key not in cls._instance:
+            cls._instance[key] = super(ServerConfig,cls).__new__(cls)
+            cls._instance[key].host = host
+            cls._instance[key].port = port
+        return cls._instance[key]
 
 class AsyncHttpServer:
     def __init__(self, crud: BasicCRUD,task_queue:TaskQueue,host:Optional[str],port:Optional[int],parent_logger:Logger):
@@ -32,7 +97,8 @@ class AsyncHttpServer:
         self.handler_factory = RequestHandlerFactory(self.crud,)
         self._running = False
         self._name = f"asyncHS-{randint(0,99999):05d}"
-        self._logger = parent_logger.getChild(self._name)
+        self.logger = parent_logger.getChild(self._name)
+        self._performance = PerformanceParams(self._name,self._name,40)
 
     async def start(self):
         self._server = await asyncio.start_server(self.handle_request,self.host,self.port)
@@ -41,21 +107,24 @@ class AsyncHttpServer:
     
     async def stop(self):
         if self._server:
-            self._logger.info("Stopping server...")
+            self.logger.info("Stopping server...")
             self._server.close()
             await self._server.wait_closed()
     
     async def handle_request(self,reader:StreamReader,writer:StreamWriter):
         start_time=perf_counter()
+        self._performance.add_request_time(time())
         data = await reader.read(1024)
         message = data.decode()
         addr = writer.get_extra_info('peername')
-        self._logger.info("Received %r from %r",message,addr)
+        self.logger.info("Received %r from %r",message,addr)
         
         response = await self.process_request(message)
         await self.task_queue.add_task(self.send_confirmation,response,addr)
-        self._logger.info("Sending back response: %r",response)
+        self.logger.info("Sending back response: %r",response)
         writer.write(response.encode())
+        response_time = perf_counter()-start_time
+        self._performance.add_response_time(response_time)
         await writer.drain()
         await writer.wait_closed()
         
@@ -71,7 +140,7 @@ class AsyncHttpServer:
                 key,value = line.split(':',1)
                 headers[key.lower()] = value.strip()
             except:
-                self._logger.info("Passed on Line: %s",line)
+                self.logger.info("Passed on Line: %s",line)
         if single_carrier_return_idx < len(request_lines) -1:
             body = '\n'.join(request_lines[single_carrier_return_idx+1:])
         context = RequestContext()
@@ -85,7 +154,7 @@ class AsyncHttpServer:
                 request_data['booking'] = json_loads(body)
                 await self.task_queue.add_task(self.send_confirmation,request_data['booking'])
             result = handler.handle_request(request_data)
-            self._logger.debug("Request processed",extra={'trace_context': context.to_dict()})
+            self.logger.debug("Request processed",extra={'trace_context': context.to_dict()})
             return self.create_response(200,result)
         except Exception as e:
             return self.create_response(500,str(e))
@@ -102,5 +171,7 @@ class AsyncHttpServer:
 
     async def send_confirmation(self,booking_id:str,address:str)->int:
         await asyncio.sleep(1)  # Simulate some processing time
-        self._logger.info("Sent confirmation msg for database-change to %s.",address)
+        self.logger.info("Sent confirmation msg for database-change to %s.",address)
         return 0
+        return 0
+

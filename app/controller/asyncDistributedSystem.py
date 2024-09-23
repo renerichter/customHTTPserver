@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from asyncio import StreamReader, StreamWriter
 from logging import Logger, getLogger
 from random import randint
-from time import perf_counter
+from time import perf_counter, time
 from typing import Any, Dict, List, Tuple
 
 import psutil
@@ -12,6 +12,7 @@ import psutil
 from ..model.database import DatabaseConnection, cachedTravelCRUD
 from .asyncHttpServer import AsyncHttpServer
 from .logger import LoggerSetup, RequestContext
+from .monitoring import DashboardDisplay, PerformanceParams
 from .names import CreativeNamer
 from .taskQueue import TaskQueue
 
@@ -55,7 +56,7 @@ class asyncNode:
             return False
         
     async def health_report(self):
-        start_time=time.perf_counter()
+        start_time=perf_counter()
         cpu_usage = psutil.cpu_percent(interval=1) 
         mem_usage = psutil.virtual_memory().percent
         mem_available = psutil.virtual_memory().available / (1024 * 1024)
@@ -63,7 +64,7 @@ class asyncNode:
         
         await asyncio.sleep(0.1)
         # health check latency
-        latency = (time.perf_counter() -start_time)*1000 #ms
+        latency = (perf_counter() -start_time)*1000 #ms
         
         return {
             "cpu_usage": cpu_usage,
@@ -108,17 +109,22 @@ class asyncRoundRobinBalancer(asyncLoadBalancer):
     def __init__(self,nodes:List[asyncNode],parent_logger:Logger):
         self._nodes = nodes
         self._current_idx = 0
-        self._name = f"LB-RR-{randint(0,9)}"
+        self._id=randint(0,9)
+        self._name = f"LB-RR-{self._id}"
         self._logger = parent_logger.getChild(self._name)
+        self._performance = PerformanceParams(self._name,str(self._id),40)
     
     def get_next_node(self,context: RequestContext) -> asyncNode:
         start_time = perf_counter()
+        self._performance.add_request_time(time())
         if len(self._nodes) == 0:
             self._logger.error("No Nodes for routing left.")
             raise ValueError("No Nodes for routing left")
         node = self._nodes[self._current_idx]
+        response_time = perf_counter()-start_time
         self._current_idx = (self._current_idx + 1)%len(self._nodes)
-        context.add_response_time(self._name,perf_counter()-start_time)
+        context.add_response_time(self._name,response_time)
+        self._performance.add_response_time(response_time)
         return node
 
     def update_nodes_list(self,new_nodes:List[asyncNode]):
@@ -165,9 +171,11 @@ class asyncDistributedBookingSystem:
         
         # task queue
         self._global_task_queue = TaskQueue(self._logger,name="GlobalTaskQueue",nworkers=global_q_params[0],qsize=global_q_params[1])
+        self.performance = PerformanceParams('DBS','DBS',30)
+        self.dashboard = DashboardDisplay(self.performance)
     
     def add_node(self,host:str,port:int):
-        crud = cachedTravelCRUD(self._db,self._db_params,self._table_name)
+        crud = cachedTravelCRUD(self._db,self._db_params,self._table_name,parent_logger=self._logger)
         node_id = len(self._nodes)
         node = asyncNode(crud,host,port,self._namer.create_name(1),node_id,parent_logger=self._logger)
         self._nodes.append(node)
