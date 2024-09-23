@@ -1,10 +1,13 @@
 import asyncio
+import pathlib
+import signal
 from logging import INFO, basicConfig, getLogger
 from typing import Any, Dict
 
 from app.controller.asyncDistributedSystem import asyncDistributedBookingSystem
 from app.controller.distibutedSystem import DistributedBookingSystem
 from app.controller.httpServer import HTTPserver
+from app.controller.logger import LoggerSetup
 #from app.controller.httpClient import HttpClient
 from app.controller.parser import ParserFactory
 from app.model.booking import BookingAnalyzer, BookingManager
@@ -20,7 +23,7 @@ test_LoadBalancing = False
 test_TaskQueue = True
 
 basicConfig(level=INFO)
-logger = getLogger(__name__)
+logger = getLogger('main')
 
 postgres_db_params:Dict[str,Any]={
             'host': 'localhost',
@@ -31,7 +34,7 @@ postgres_db_params:Dict[str,Any]={
         }
 
 def test_booking_func()->None:
-    logger.info('Booking-Class test: Started.')
+    print('Booking-Class test: Started.')
     parser_factory = ParserFactory()
     file_path = 'data/travel_bookings.csv'
     parser = parser_factory.getParser('csv')
@@ -41,10 +44,10 @@ def test_booking_func()->None:
     booking_analyzer = BookingAnalyzer()
     dep_cities=booking_analyzer.bookings_per_departure_city(bookings)
     print(dep_cities)
-    logger.info('Booking-Class test: Done.')
+    print('Booking-Class test: Done.')
 
 def test_getRequest_func()->None:
-    logger.info('getRequest test: Started.')
+    print('getRequest test: Started.')
     parser_factory = ParserFactory()
     parser = parser_factory.getParser('json')
     url_api = "api.open-meteo.com"
@@ -55,10 +58,10 @@ def test_getRequest_func()->None:
     result = '{"latitude":35.2,"longitude":138.4375,"generationtime_ms":0.06496906280517578,"utc_offset_seconds":0,"timezone":"GMT","timezone_abbreviation":"GMT","elevation":730.0,"current_weather_units":{"time":"iso8601","interval":"seconds","temperature":"°C","windspeed":"km/h","winddirection":"°","is_day":"","weathercode":"wmo code"},"current_weather":{"time":"2024-09-13T13:15","interval":900,"temperature":21.3,"windspeed":3.3,"winddirection":264,"is_day":0,"weathercode":0}}'
     parsed_result= parser.parse_one(result)
     print(parsed_result)
-    logger.info('getRequest test: Done.')
+    print('getRequest test: Done.')
 
 def test_crud_func()->None:
-    logger.info('Crud test: Started.')
+    print('Crud test: Started.')
     parser_factory = ParserFactory()
     db_params=postgres_db_params
     crud = travelCRUD(PostgresqlDB,db_params,'bookings')
@@ -82,26 +85,26 @@ def test_crud_func()->None:
     
     # delete 1 entry
     crud.delete_booking('625cd3c9-0116-452f-816c-91aa6e236110')
-    logger.info('Crud test: Done.')
+    print('Crud test: Done.')
 
 def test_httpServer_func()->None:
-    logger.info('HttpServer test: Started.')
+    print('HttpServer test: Started.')
     db_params=postgres_db_params
     crud = travelCRUD(PostgresqlDB,db_params,'bookings')
     server = HTTPserver(crud)
     server.start()
-    logger.info('HttpServer test: Ended.')
+    print('HttpServer test: Ended.')
  
 def test_cache_func()->None:
-    logger.info('Cache test: Started.')
+    print('Cache test: Started.')
     db_params=postgres_db_params
     cachedCrud = cachedTravelCRUD(PostgresqlDB,db_params,'bookings',False,LruCache(20,30))
     server = HTTPserver(cachedCrud)
     server.start()
-    logger.info('Cache test: Done.')
+    print('Cache test: Done.')
 
 def test_LoadBalancing_func()->None:
-    logger.info('LoadBalancing test: Started.')
+    print('LoadBalancing test: Started.')
     db = PostgresqlDB
     db_params = postgres_db_params
     table_name = 'bookings'
@@ -121,18 +124,25 @@ def test_LoadBalancing_func()->None:
     #running_system.start()
     #print(running_system.is_alive())
     print(distributed_system.get_status())
-    logger.info('LoadBalancing test: Done.')
+    print('LoadBalancing test: Done.')
 
 async def test_TaskQueue_func()->None:
-    logger.info('TaskQueue test: Started.')
+    logger_setup = LoggerSetup("app/controller/logging_config.json")
+    print('TaskQueue test: Started.')
     db = PostgresqlDB
     db_params = postgres_db_params
     table_name = 'bookings'
     host="localhost"
     base_port=8181
+    global_q_params = (5,15)
     q_params = (3,5)
-    dbs = asyncDistributedBookingSystem(host,base_port,db,db_params,table_name,q_params)
-    
+    dbs = asyncDistributedBookingSystem(host,base_port,db,db_params,table_name,global_q_params,q_params,logger_setup,'INFO')
+    loop = asyncio.get_event_loop()
+
+    # make sure to exit gracefully
+    loop.add_signal_handler(signal.SIGINT, lambda: asyncio.create_task(dbs.stop()))
+    loop.add_signal_handler(signal.SIGTERM, lambda: asyncio.create_task(dbs.stop()))
+
     for i in range(1,6):
         dbs.add_node(host,base_port+i)
     dbs.set_load_balancer("roundrobin")
@@ -140,7 +150,7 @@ async def test_TaskQueue_func()->None:
     await dbs.start()
     
     print(dbs.get_status())
-    logger.info('TaskQueue test: Done.')
+    print('TaskQueue test: Done.')
 
 if __name__ == '__main__':
     print("こんにちは！元気ですか?")
