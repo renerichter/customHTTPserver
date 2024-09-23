@@ -2,21 +2,22 @@ import asyncio
 import time
 from abc import ABC, abstractmethod
 from asyncio import StreamReader, StreamWriter
-from logging import INFO, basicConfig, getLogger
+from logging import Logger, getLogger
+from random import randint
+from time import perf_counter
 from typing import Any, Dict, List, Tuple
 
 import psutil
 
 from ..model.database import DatabaseConnection, cachedTravelCRUD
 from .asyncHttpServer import AsyncHttpServer
+from .logger import LoggerSetup, RequestContext
 from .names import CreativeNamer
 from .taskQueue import TaskQueue
 
-basicConfig(level=INFO)
-logger = getLogger(__name__)
 
 class asyncNode:
-    def __init__(self,crud:cachedTravelCRUD,host:str,port:int,node_name:str,node_id:int,nbr_qworkers:int=3,qsize:int=5):
+    def __init__(self,crud:cachedTravelCRUD,host:str,port:int,node_name:str,node_id:int,parent_logger:Logger,nbr_qworkers:int=3,qsize:int=5):
         self.host = host
         self.port = port
         self._crud = crud
@@ -24,13 +25,15 @@ class asyncNode:
         self._thread = None
         self._name = node_name
         self._id = node_id
-        self.task_queue = TaskQueue(nbr_qworkers,qsize)
+        self._logger = parent_logger.getChild(f"Node-{self._id:02d}")
+        self.task_queue = TaskQueue(self._logger,f"LocalTQ-Node{self._id}",nworkers=nbr_qworkers,qsize=qsize)
+        
     
     async def start(self):
         await self.task_queue.start()
-        self._httpServer=AsyncHttpServer(self._crud,self.task_queue,self.host,self.port)
+        self._httpServer=AsyncHttpServer(self._crud,self.task_queue,self.host,self.port,self._logger)
         self._thread = asyncio.create_task(self._httpServer.start())
-        logger.info(self)
+        self._logger.info(self)
     
     async def stop(self):
         if self._httpServer:
@@ -39,8 +42,8 @@ class asyncNode:
             await self._thread
         await self.task_queue.stop()
         
-        logger.info("%s\n------->>-------Bye 😜------->>-------\n",self)
-        
+        self._logger.info("%s\n------->>-------Bye 😜------->>-------\n",self)
+
     
     async def health_check(self) -> bool:
         try:
@@ -48,7 +51,7 @@ class asyncNode:
             mem_available = psutil.virtual_memory().available /1024/1024
             return cpu_usage < 90 and mem_available > 100
         except Exception as e: 
-            logger.error("Health check failed for node %s on port %d: %s",self._name,self.port,str(e),exc_info=True)
+            self._logger.error("Health check failed for node %s on port %d: %s",self._name,self.port,str(e),exc_info=True)
             return False
         
     async def health_report(self):
@@ -69,6 +72,16 @@ class asyncNode:
             "disk_usage": disk_usage,
             "latency_ms": latency
         }
+    
+    def get_node_info(self)->Dict[str,Any]:
+        return {'name': self._name, 
+                'host': self.host,
+                'port': self.port,
+                'id':   self._id,
+                'crud': str(self._crud),
+                'http': str(self._httpServer),
+                'thread': str(self._thread)
+                }
 
     
     def __str__(self):
@@ -76,7 +89,7 @@ class asyncNode:
 
 class asyncLoadBalancer(ABC):
     @abstractmethod
-    def get_next_node(self) -> asyncNode:
+    def get_next_node(self,context: RequestContext) -> asyncNode:
         pass
 
     @abstractmethod
@@ -92,16 +105,20 @@ class asyncLoadBalancer(ABC):
         pass
 
 class asyncRoundRobinBalancer(asyncLoadBalancer):
-    def __init__(self,nodes:List[asyncNode]):
+    def __init__(self,nodes:List[asyncNode],parent_logger:Logger):
         self._nodes = nodes
         self._current_idx = 0
+        self._name = f"LB-RR-{randint(0,9)}"
+        self._logger = parent_logger.getChild(self._name)
     
-    def get_next_node(self) -> asyncNode:
+    def get_next_node(self,context: RequestContext) -> asyncNode:
+        start_time = perf_counter()
         if len(self._nodes) == 0:
-            logger.error("No Nodes for routing left.")
+            self._logger.error("No Nodes for routing left.")
             raise ValueError("No Nodes for routing left")
         node = self._nodes[self._current_idx]
         self._current_idx = (self._current_idx + 1)%len(self._nodes)
+        context.add_response_time(self._name,perf_counter()-start_time)
         return node
 
     def update_nodes_list(self,new_nodes:List[asyncNode]):
@@ -121,13 +138,13 @@ class asyncRoundRobinBalancer(asyncLoadBalancer):
     async def get_health_reports(self) -> Dict[str, Dict[str, Any]]:
         reports:Dict[str, Dict[str, Any]] = {}
         for node in self._nodes:
-            reports[node._name] = await node.health_report()
+            reports[node.get_node_info()['name']] = await node.health_report()
         return reports
             
 
 
 class asyncDistributedBookingSystem:
-    def __init__(self,host:str,port:int,db:DatabaseConnection, db_params: Dict[str,Any], table_name:str,q_params:Tuple[int,int]):
+    def __init__(self,host:str,port:int,db:DatabaseConnection, db_params: Dict[str,Any], table_name:str,global_q_params:Tuple[int,int],q_params:Tuple[int,int],logger_setup:LoggerSetup,logger_level:str):
         self.host = host
         self.port = port
         self._nodes:List[asyncNode]=[]
@@ -139,11 +156,20 @@ class asyncDistributedBookingSystem:
         self._server = None
         self._is_running = False
         self._qparams = q_params
+        self._logger_setup = logger_setup
+        self._logger_level = logger_level
+        
+        # start logger
+        self._logger_setup.setup_logging()
+        self._logger=getLogger('DBS')
+        
+        # task queue
+        self._global_task_queue = TaskQueue(self._logger,name="GlobalTaskQueue",nworkers=global_q_params[0],qsize=global_q_params[1])
     
     def add_node(self,host:str,port:int):
         crud = cachedTravelCRUD(self._db,self._db_params,self._table_name)
         node_id = len(self._nodes)
-        node = asyncNode(crud,host,port,self._namer.create_name(1),node_id)
+        node = asyncNode(crud,host,port,self._namer.create_name(1),node_id,parent_logger=self._logger)
         self._nodes.append(node)
         
         if self._load_balancer:
@@ -155,36 +181,39 @@ class asyncDistributedBookingSystem:
             
     async def stop_node(self,node_id:int):
         if node_id >= len(self._nodes):
-            logger.error(f"Node ID=%d not found",node_id)
+            self._logger.error(f"Node ID=%d not found",node_id)
             return 1
         else:
-            logger.info(">>> Stopping node %s...",self._nodes[node_id])
+            self._logger.info(">>> Stopping node %s...",self._nodes[node_id])
             await self._nodes[node_id].stop()
             return 0
 
     def set_load_balancer(self,balancer_type:str):
         match balancer_type:
             case "roundrobin":
-                self._load_balancer = asyncRoundRobinBalancer(self._nodes)
+                self._load_balancer = asyncRoundRobinBalancer(self._nodes,self._logger)
             case _:
-                self._load_balancer = asyncRoundRobinBalancer(self._nodes)
-                logger.info("No logger given or given logger name: %s unknown. Chose default balancer roundrobin.",balancer_type)
+                self._load_balancer = asyncRoundRobinBalancer(self._nodes,self._logger)
+                self._logger.info("No logger given or given logger name: %s unknown. Chose default balancer roundrobin.",balancer_type)
     
     async def start(self):        
+        self._logger.info("DBS --> Starting up...")
+        await self._global_task_queue.start()
+        
+        # start nodes
         for node in self._nodes:  
             await node.start()
         
-        logger.info("DBS --> Starting up...")
         self._server = await asyncio.start_server(self.handle_connection,self.host,self.port)
         self._is_running = True
-        logger.info("DBS ---> Listening on %s:%d.",self.host,self.port)
+        self._logger.info("DBS ---> Listening on %s:%d.",self.host,self.port)
         asyncio.create_task(self.health_check_routine())
 
         async with self._server:
             await self._server.serve_forever()    
 
     async def stop(self):
-        logger.info("DistributedBookingSystem ---> Stopping all Nodes...")
+        self._logger.info("DistributedBookingSystem ---> Stopping all Nodes...")
         self._is_running = False
         if self._server:
             self._server.close()
@@ -192,34 +221,50 @@ class asyncDistributedBookingSystem:
 
         for node in self._nodes:
             await node.stop()
+        
+        await self._global_task_queue.stop()
+        await self._logger_setup.stop_logging()
+
 
     async def handle_connection(self,reader: StreamReader, writer:StreamWriter):
-        node=self._load_balancer.get_next_node()
-        logger.info("-------------- Active node=%d.----------",node.port)
-        
+        context = RequestContext()
+        node=self._load_balancer.get_next_node(context)
+        self._logger.info("-------------- Active node=%d.----------",node.port)
         try: 
             while True:
                 data = await reader.read(1024)
                 if not data:
                     break
-                response = await self.forward_data(data,node)
+                #await self._global_task_queue.add_task(self.process_request,data,context,writer)
+                response,context = await self.forward_data(data,node,context)
                 writer.write(response)
                 await writer.drain()
         except Exception as e: 
-            logger.error("Error handling client request: %s",str(e),exc_info=True)
+            self._logger.error("Error handling client request: %s",str(e),extra={'trace_context': context.to_dict()},exc_info=True)
             raise
-        finally: 
+        finally:
             writer.close()
             await writer.wait_closed()
+            self._logger.info("Connection closed",extra={'trace_context': context.to_dict()})
     
-    async def forward_data(self,data:bytes, node:asyncNode):
+    # async def process_request(self,data:bytes,context:RequestContext, writer:StreamWriter):
+    #     node=self._load_balancer.get_next_node(context)
+    #     self._logger.info("-------------- Active node=%d.----------",node.port)
+    #     response,context = await self.forward_data(data,node,context)
+    #     writer.write(response)
+    #     await writer.drain()
+    #     writer.close()
+    #     await writer.wait_closed()
+    
+    async def forward_data(self,data:bytes,node:asyncNode,context:RequestContext):
         reader,writer = await asyncio.open_connection(node.host,node.port)
         try:
             writer.write(data)
             await writer.drain()
             response = await reader.read(1024)
-            logger.info("Received response: %s from node %s",response.decode(),node)
-            return response
+            context.add_response_time(f"Node-{node.get_node_info()['id']:02d}-response",perf_counter()-context.start_time)
+            self._logger.info("Received response: %s from node %s",response.decode(),node)
+            return response,context
         finally:
             writer.close()
             await writer.wait_closed()
@@ -235,9 +280,9 @@ class asyncDistributedBookingSystem:
         while self._is_running:
             dead_nodes = await self._load_balancer.do_health_checks()
             if dead_nodes:
-                await self.replace_dead_nodes(len(dead_nodes))
+                await self.replace_dead_nodes(dead_nodes)
             health_reports = await self._load_balancer.get_health_reports()
-            logger.info("Health Reports: %s",health_reports)
+            self._logger.info("Health Reports: %s",health_reports)
             await asyncio.sleep(60)
                     
 
@@ -250,3 +295,4 @@ class asyncDistributedBookingSystem:
         res+=f"|\t>Status Server is runnning = {self._is_running}.\n"
         res+="--------- DistributedBookingSystem -----------\n"
         return res
+    

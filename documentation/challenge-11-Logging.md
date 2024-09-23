@@ -42,8 +42,22 @@ Implement a **distributed logging system** with support for **traceability** acr
 
 ## The UML Diagram
 
-???
+many small changes and additions, but no new UML logic.
 
 ## The Solution
 
-???
+
+### Steps and Problems
+
+- create [`RequestContext`](../app/controller/logger.py)-object which gets initialized in [`asyncDistributedSystem`](../app/controller/asyncDistributedSystem.py) (aDBS)
+    - holds properties like given in the task
+    - AND: unique-ID generated using `uuid.uuid4()` function
+- **Problem 1: How to fwd trace-ID?** 
+    - aDBS uses `Loadbalancer` to select an `asyncNode` (aN), then opens a connection and sends the data forward to the aN (which runs in its own thread)
+    - aN is managed by a local-`TaskQueue` (lTQ)
+        - **Note:** That was the idea, but somehow task-handling with async-package was odd, so for now tasks are directly passed through and are not handled by lTQ -> should be **reimplemented in future!!**
+    - tasks are then processed by a running `asyncHttpServer` (aHttpS) who manages CRUD-requests to the postgresQL database etc
+    - as the client connects to aDBS, aDBS forwards to aHttpS using streaming passing the trace-ID is a problem
+    - introducing the trace-ID as a property of the task and setting up the local (and global) task-queue properly would easily solve this problem, but... (see above)
+- anyways: based on the awesome work of [James Murphy](https://github.com/mCodingLLC/VideosSampleCode/tree/master/videos/135_modern_logging) implemented Logging-Queue with Jsonl-Formatting -> non-blocking and beautiful
+    - adapted to my needs and implemented it using DBS as main and `getChild` function for every derived thread or sub-instance
