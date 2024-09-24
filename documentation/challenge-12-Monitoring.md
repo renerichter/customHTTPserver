@@ -61,4 +61,19 @@ Build a **real-time monitoring system** that tracks performance metrics and disp
 
 ## The Solution
 
-???
+### Steps
+
+- add [monitoring](../app/controller/monitoring.py)-module with 
+    - `PerformanceParams`-class to track device properties and performance parameters like `request_times`, `response_times`, `last_update`-time and more
+    - `CacheParams`-class derived from `PerformanceParams`-class with minor extensions
+    - `DashboardDisplay`-class for cli-output using `rich`-package
+- use mqtt for service communication
+    - create `docker-compose` configuration and fix for accepting any non-local connection (insecure, but working!)
+    - `aDBS` subscribes to the respective services `health/<service_id>` channel
+    - `services` (like `asyncNode`, `RoundRobinLoadBalancer`, etc) publish `health_data` to their channel
+- including a lot of `service` (id and name) tracking in aDBS-class
+
+### Problems
+
+- when using many clients encountering co-routine errors due to already finished but still needed co-routines
+- somehow `Cache` health-report not working

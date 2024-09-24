@@ -13,6 +13,6 @@ def spawn_clients(n_clients:int):
         process.wait()
 
 if __name__ == '__main__':
-    n_clients = 10
+    n_clients = 2
     spawn_clients(n_clients)
 

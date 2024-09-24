@@ -1,5 +1,4 @@
 import asyncio
-import pathlib
 import signal
 from logging import INFO, basicConfig, getLogger
 from typing import Any, Dict
@@ -134,9 +133,10 @@ async def test_TaskQueue_func()->None:
     table_name = 'bookings'
     host="localhost"
     base_port=8181
+    broker_addr = ('localhost',1883)
     global_q_params = (5,15)
     q_params = (3,5)
-    dbs = asyncDistributedBookingSystem(host,base_port,db,db_params,table_name,global_q_params,q_params,logger_setup,'INFO')
+    dbs = asyncDistributedBookingSystem(host,base_port,db,db_params,table_name,global_q_params,q_params,logger_setup,'INFO',broker_addr)
     loop = asyncio.get_event_loop()
 
     # make sure to exit gracefully
