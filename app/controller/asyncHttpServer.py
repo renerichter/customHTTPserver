@@ -9,13 +9,15 @@
     - use existing connector
 """
 import asyncio
+import json
 from abc import ABC, abstractmethod
 from asyncio import StreamReader, StreamWriter
-from json import loads as json_loads
 from logging import Logger
-from random import randint
 from time import perf_counter, time
 from typing import Any, Dict, Optional, Union
+from uuid import uuid4
+
+import paho.mqtt.client as mqtt
 
 from ..model.database import BasicCRUD
 from .logger import RequestContext
@@ -88,7 +90,7 @@ class ServerConfig:
         return cls._instance[key]
 
 class AsyncHttpServer:
-    def __init__(self, crud: BasicCRUD,task_queue:TaskQueue,host:Optional[str],port:Optional[int],parent_logger:Logger):
+    def __init__(self, crud: BasicCRUD,task_queue:TaskQueue,host:Optional[str],port:Optional[int],parent_logger:Logger,broker_addr:str='localhost'):
         self.config = ServerConfig(host,port)
         self.host = host
         self.port = port
@@ -96,16 +98,26 @@ class AsyncHttpServer:
         self.task_queue = task_queue
         self.handler_factory = RequestHandlerFactory(self.crud,)
         self._running = False
-        self._name = f"asyncHS-{randint(0,99999):05d}"
+        self._id=str(uuid4())
+        self._name = f"aHttpServer-{self._id[:8]}"
         self.logger = parent_logger.getChild(self._name)
         self._performance = PerformanceParams(self._name,self._name,40)
-
+        self.broker_address = broker_addr
+        self.mqtt_client = mqtt.Client()
+        self.mqtt_client.connect(self.broker_address,keepalive=120)
+        
     async def start(self):
         self._server = await asyncio.start_server(self.handle_request,self.host,self.port)
+        self.health_task=asyncio.create_task(self.publish_health())
+        self.crud.start()
+        self.is_running=True
         async with self._server:
             await self._server.serve_forever()
     
     async def stop(self):
+        self.is_running=False
+        if self.health_task:
+            self.health_task.cancel()
         if self._server:
             self.logger.info("Stopping server...")
             self._server.close()
@@ -151,7 +163,7 @@ class AsyncHttpServer:
             handler = self.handler_factory.create_handler(method)
             request_data:Dict[str,Any]= {'path':path,'headers':headers,'body':body}
             if method == 'POST':
-                request_data['booking'] = json_loads(body)
+                request_data['booking'] = json.loads(body)
                 await self.task_queue.add_task(self.send_confirmation,request_data['booking'])
             result = handler.handle_request(request_data)
             self.logger.debug("Request processed",extra={'trace_context': context.to_dict()})
@@ -175,3 +187,19 @@ class AsyncHttpServer:
         return 0
         return 0
 
+    def get_info(self)->Dict[str,Any]:
+        return {'name':self._name,
+                'id':self._id,
+                'host':self.host,
+                'port': self.port,
+                'crud': self.crud.get_info(),
+                'task_queue': self.task_queue.get_info(),
+                'is_running': self._running,
+                'logger': str(self.logger),}
+
+    async def publish_health(self):
+        while True:
+            if not self.mqtt_client.is_connected():
+                self.mqtt_client.connect(self.broker_address,keepalive=120)
+            self.mqtt_client.publish(f"health/{self._id}",json.dumps(self._performance.get_perf_report()))
+            await asyncio.sleep(10)

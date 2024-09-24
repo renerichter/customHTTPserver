@@ -2,8 +2,8 @@ import asyncio
 from asyncio import Queue, TimeoutError
 from dataclasses import dataclass
 from logging import Logger
-from random import randint
-from typing import Any, Callable, List, Optional
+from typing import Any, Callable, Dict, List, Optional
+from uuid import uuid4
 
 
 @dataclass
@@ -22,7 +22,8 @@ class TaskQueue:
         self._queue:Queue[Any] = Queue(qsize)
         self._workers:List[Any] = []
         self.is_running = False
-        self._name = name if name else f"TQ-{randint(0,99999):05d}"
+        self._id=str(uuid4())
+        self._name = name if name else f"TQ-{self._id[:8]}"
         self._logger = parent_logger.getChild(self._name)
 
     async def add_task(self,func:Callable[...,Any],*args:Any,**kwargs:Any):
@@ -71,3 +72,11 @@ class TaskQueue:
             worker.cancel()
         await asyncio.gather(*self.workers,return_exceptions=True)
         self._logger.info("All workers stopped")
+    
+    def get_info(self)->Dict[str,Any]:
+        return {'name':self._name,
+                'id': self._id,
+                'nworkers':self._nworkers,
+                'max_qsize': self._queue.maxsize,
+                'current_qsize': self._queue.qsize,
+                'logger': str(self._logger),}
